@@ -1,0 +1,4 @@
+[submodule "mercury-agent"]
+	path = mercury-agent
+	url = https://github.com/cosmicstack-labs/mercury-agent.git
+	branch = main
