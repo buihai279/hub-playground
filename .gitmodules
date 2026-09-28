@@ -2,3 +2,19 @@
 	path = mercury-agent
 	url = https://github.com/cosmicstack-labs/mercury-agent.git
 	branch = main
+[submodule "imagor"]
+	path = imagor
+	url = https://github.com/cshum/imagor.git
+	branch = master
+[submodule "imagorface"]
+	path = imagorface
+	url = https://github.com/cshum/imagorface.git
+	branch = main
+[submodule "imagorvideo"]
+	path = imagorvideo
+	url = https://github.com/cshum/imagorvideo.git
+	branch = master
+[submodule "imagor-studio"]
+	path = imagor-studio
+	url = https://github.com/cshum/imagor-studio.git
+	branch = main
