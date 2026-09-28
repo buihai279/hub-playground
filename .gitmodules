@@ -18,3 +18,7 @@
 	path = imagor-studio
 	url = https://github.com/cshum/imagor-studio.git
 	branch = main
+[submodule "strix"]
+	path = strix
+	url = https://github.com/usestrix/strix.git
+	branch = main
