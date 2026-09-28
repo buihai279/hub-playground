@@ -1,0 +1,26 @@
+services:
+  imagor:
+    image: shumc/imagor:latest
+    container_name: hub-playground-imagor
+    restart: unless-stopped
+    command:
+      - -imagor-unsafe
+      - -imagor-auto-webp
+    ports:
+      - "0.0.0.0:8400:8000"
+
+  imagor-studio:
+    image: shumc/imagor-studio:latest
+    container_name: hub-playground-imagor-studio
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:///app/data/imagor-studio.db
+      # Match the host owner of ./gallery and ./studio-data so the container
+      # process (uid 1000 = server) can write into both bind mounts.
+      PUID: "1000"
+      PGID: "1000"
+    volumes:
+      - ./studio-data:/app/data
+      - ./gallery:/app/gallery
+    ports:
+      - "0.0.0.0:8401:8000"
