@@ -22,3 +22,7 @@
 	path = strix
 	url = https://github.com/usestrix/strix.git
 	branch = main
+[submodule "paperclip"]
+	path = paperclip
+	url = https://github.com/paperclipai/paperclip.git
+	branch = master

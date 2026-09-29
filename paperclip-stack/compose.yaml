@@ -1,0 +1,51 @@
+# Paperclip — open-source control plane for teams of AI agents.
+#
+# Deploy stack for hub-playground. Runs the published upstream image
+# (ghcr.io/paperclipai/paperclip, Dockerfile `production` target) as a single
+# container on Paperclip's embedded PostgreSQL, so no external database is
+# required. Upstream source is vendored in the ../paperclip git submodule.
+#
+#   cp .env.example .env      # then fill in the secrets
+#   docker compose up -d
+#
+# To build the image from the submodule instead of pulling it, see
+# compose.build.yaml and README.md.
+services:
+  paperclip:
+    image: ghcr.io/paperclipai/paperclip:latest
+    container_name: hub-playground-paperclip
+    restart: unless-stopped
+    # Backstop against a leaked-process fork bomb; the image already runs tini
+    # as PID 1 to reap orphaned agent descendants.
+    pids_limit: 2048
+    ports:
+      - "0.0.0.0:3100:3100"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "3100"
+      SERVE_UI: "true"
+      PAPERCLIP_HOME: "/paperclip"
+
+      # ── Access model ───────────────────────────────────────────────────
+      # authenticated = users must sign in; private = LAN/Tailscale only.
+      PAPERCLIP_DEPLOYMENT_MODE: "authenticated"
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: "private"
+      PAPERCLIP_PUBLIC_URL: "${PAPERCLIP_PUBLIC_URL:-http://localhost:3100}"
+      # Extra accepted hostnames beyond the public URL host (comma-separated).
+      PAPERCLIP_ALLOWED_HOSTNAMES: "${PAPERCLIP_ALLOWED_HOSTNAMES:-}"
+
+      # ── Required secrets (set in .env) ─────────────────────────────────
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}"
+      PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: "${PAPERCLIP_TOOL_ACTION_SIGNING_SECRET:?PAPERCLIP_TOOL_ACTION_SIGNING_SECRET must be set}"
+
+      # ── Optional: LLM provider keys for local agent runs ───────────────
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+
+      # Anonymous usage telemetry is opt-out upstream; "1" disables it.
+      PAPERCLIP_TELEMETRY_DISABLED: "${PAPERCLIP_TELEMETRY_DISABLED:-0}"
+    volumes:
+      # Embedded PostgreSQL data, uploads, local secrets key and agent
+      # workspaces. Must be writable by uid/gid 1000 (see README.md).
+      - ./data:/paperclip

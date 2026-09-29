@@ -1,0 +1,18 @@
+# Override that builds the image from the ../paperclip submodule instead of
+# pulling the published one.
+#
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+#
+# Heavy: the Dockerfile compiles the native Rust runner and installs five
+# agent CLI toolchains. Expect a long first build and several GB of image.
+services:
+  paperclip:
+    image: hub-playground-paperclip:local
+    build:
+      context: ../paperclip
+      dockerfile: Dockerfile
+      target: production
+      args:
+        # Match the host owner of ./data (see README.md).
+        USER_UID: "1000"
+        USER_GID: "1000"

@@ -1,0 +1,3 @@
+# Runtime state produced by compose.yaml — never commit.
+data/
+.env
