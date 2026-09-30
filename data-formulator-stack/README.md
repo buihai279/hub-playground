@@ -71,9 +71,18 @@ The app is inert without an LLM. Either set provider keys in `.env` (see
 `.env.example`), or leave them unset and paste a key in the UI — the latter
 requires `DISABLE_CUSTOM_MODELS=false`.
 
-Sessions are server-side and keyed by a browser-supplied identity header, so
-two people using the same instance share a workspace namespace only if they
-present the same identity.
+Sessions, workspaces and the credential vault are namespaced by an identity
+resolved per request. This stack sets `HOST=0.0.0.0` so that identity is
+`browser:<uuid>`, a UUID the browser keeps in local storage — each visitor gets
+a separate namespace, at the cost of orphaning their data if they clear site
+data.
+
+Without `HOST=0.0.0.0` the app instead enters single-user mode (the upstream
+code reads `HOST` at import time and defaults it to `127.0.0.1`) and hands
+**every** visitor the same fixed `local:<os_user>` identity. That was the
+behaviour of the first deploy here: `/api/app-config` reported
+`"IS_LOCAL_MODE": true` and `"IDENTITY": {"type": "local", "id": "appuser"}`,
+so all visitors shared one workspace.
 
 ## Security notes
 

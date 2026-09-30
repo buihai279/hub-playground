@@ -28,6 +28,16 @@ services:
     env_file:
       - .env
     environment:
+      # ── Bind host / identity mode ──────────────────────────────────────
+      # auth/identity.py resolves single-user mode from this variable, read at
+      # import time — before run_app() re-parses the CLI arguments. Left unset
+      # it defaults to 127.0.0.1, which puts the container into single-user
+      # mode: every request resolves to the fixed identity local:<os_user>, so
+      # all visitors share one workspace namespace and one credential vault.
+      # Set to 0.0.0.0 (matching the image's --host) each browser instead gets
+      # its own browser:<uuid> identity.
+      HOST: "0.0.0.0"
+
       # ── Code-execution sandbox ─────────────────────────────────────────
       # MUST stay "local". The "docker" backend bind-mounts workspace paths
       # into child containers, which cannot work when Data Formulator itself
