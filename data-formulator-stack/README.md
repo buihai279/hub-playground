@@ -39,12 +39,28 @@ docker compose logs -f data-formulator
 ```
 
 The first build pulls `node:20-slim` and `python:3.11-slim`, runs a yarn install
-plus a Vite build, and then a pip install — expect several minutes and roughly
-2 GB of image layers. Later builds reuse the layer cache and only redo the stage
-whose inputs changed.
+plus a Vite build, and then a pip install — expect several minutes and a ~2.4 GB
+image. Later builds reuse the layer cache and only redo the stage whose inputs
+changed.
+
+### `./data` must exist before the first `up`
 
 `./data` must be writable by uid **1000**: the image runs as `appuser` (uid
-1000), which is the same uid as the host's `server` user.
+1000), which is the same uid as the host's `server` user — hence the `mkdir -p
+data` in the runbook above. Do not skip it.
+
+The container has no root phase, so nothing inside it can repair the mount for
+you. If `./data` is missing, Docker creates it as `root:root` and the container
+crash-loops with:
+
+    PermissionError: [Errno 13] Permission denied: '/home/appuser/.data_formulator/sessions'
+
+Recover by removing and recreating the (still empty) directory as your own user,
+then starting again:
+
+```sh
+rmdir data && mkdir data && docker compose up -d
+```
 
 ## Using it
 
