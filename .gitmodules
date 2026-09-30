@@ -34,3 +34,7 @@
 	path = odoo
 	url = https://github.com/odoo/odoo.git
 	branch = 20.0
+[submodule "laya"]
+	path = laya
+	url = https://github.com/NandhaKishorM/laya.git
+	branch = main

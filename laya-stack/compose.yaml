@@ -1,0 +1,78 @@
+# Laya decision server (laya-serve) — see README.md for the operating notes.
+#
+# Upstream ships `compose.yaml` (one-shot SDK quickstart) plus additive overlays;
+# this is the HTTP-serving subset, adapted to the hub-playground conventions:
+# a fixed image tag, an explicit host bind address, and the API key supplied as
+# a file rather than an environment variable.
+services:
+  laya-serve:
+    build:
+      context: ${LAYA_BUILD_CONTEXT:-../laya}
+      dockerfile: Dockerfile
+      args:
+        # CPU on this host: there is no NVIDIA runtime and no /dev/nvidia* node.
+        TORCH_INDEX: "${LAYA_TORCH_INDEX:-cpu}"
+        TORCH_VERSION: "${LAYA_TORCH_VERSION:-2.14.0}"
+    image: hub-playground-laya:${LAYA_IMAGE_TAG:-0.3.22}
+    # The image's ENTRYPOINT loads the *_FILE secrets and then execs this.
+    command: ["laya-serve"]
+    container_name: hub-playground-laya
+    init: true
+    restart: unless-stopped
+    pids_limit: 1024
+    ports:
+      # The API is authenticated (see LAYA_API_KEY_FILE below), so it is reachable
+      # from the LAN. Set LAYA_BIND_ADDRESS=127.0.0.1 to keep it on loopback.
+      - "${LAYA_BIND_ADDRESS:-0.0.0.0}:${LAYA_PORT:-8000}:${LAYA_PORT:-8000}"
+    environment:
+      LAYA_HOST: "0.0.0.0"
+      LAYA_PORT: "${LAYA_PORT:-8000}"
+      LAYA_DEVICE: "${LAYA_DEVICE:-cpu}"
+      # 4 of the host's 10 cores; this box also serves the MedBASE staging stack.
+      LAYA_THREADS: "${LAYA_THREADS:-4}"
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-4}"
+      LAYA_LOG_LEVEL: "${LAYA_LOG_LEVEL:-info}"
+      # 0 = download and build each checkpoint on first use. Pulling the whole
+      # family at boot is a multi-GB download, so the README warms the models
+      # explicitly instead (see "Warming the models").
+      LAYA_PRELOAD: "${LAYA_PRELOAD:-0}"
+      # Unset keeps the upstream Router default (2 checkpoints resident).
+      # Set to 1 on a tight box: one checkpoint in memory, 7-10 s reload on a
+      # language switch.
+      LAYA_MAX_LOADED: "${LAYA_MAX_LOADED:-}"
+      # Restricts the checkpoints the Router may choose from, e.g. "multilingual".
+      LAYA_MODELS: "${LAYA_MODELS:-}"
+      LAYA_AUTO_TASK: "${LAYA_AUTO_TASK:-0}"
+      # URL prefix when served behind a reverse proxy that strips the prefix.
+      LAYA_ROOT_PATH: "${LAYA_ROOT_PATH:-}"
+      # Every checkpoint download resolves to this Hub revision; "reviewed" uses
+      # the SHAs in laya/revisions.py. Empty keeps the Hub default.
+      LAYA_REVISION: "${LAYA_REVISION:-}"
+      HF_HUB_OFFLINE: "${HF_HUB_OFFLINE:-0}"
+      # Secrets are read from files, never from the environment: an environment
+      # variable is readable by anyone in the docker group via `docker inspect`.
+      LAYA_API_KEY_FILE: "/run/secrets/laya_api_key"
+    volumes:
+      # Checkpoints live here (~1.5 GB for the default english+multilingual pair).
+      # A named volume rather than a bind mount: the image runs as uid 10001 and
+      # this host has no passwordless sudo to chown a host directory to it.
+      - laya-model-cache:/home/laya/.cache/huggingface
+      - ./secrets/laya_api_key:/run/secrets/laya_api_key:ro
+    healthcheck:
+      # Same probe as upstream: the server preloads before it binds, so /health
+      # answers once the preloaded checkpoints are ready.
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['LAYA_PORT'] + '/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+      start_interval: 2s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  laya-model-cache:
+    name: ${LAYA_CACHE_VOLUME:-hub-playground-laya-model-cache}
