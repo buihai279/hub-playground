@@ -30,3 +30,7 @@
 	path = data-formulator
 	url = https://github.com/microsoft/data-formulator.git
 	branch = main
+[submodule "odoo"]
+	path = odoo
+	url = https://github.com/odoo/odoo.git
+	branch = 20.0

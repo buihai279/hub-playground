@@ -1,0 +1,2 @@
+# Secrets for compose.yaml — never commit.
+.env
