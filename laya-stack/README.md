@@ -160,6 +160,27 @@ docker volume inspect hub-playground-laya-model-cache
 - **Busy responses** — the server returns `503` with `Retry-After` when it has no
   checkpoint slot free.
 
+## Measured on this host
+
+Numbers from the first deploy (Xeon E5-2680 v4, 10 cores, no GPU, `LAYA_THREADS=4`),
+so nobody has to infer what CPU-only means here:
+
+| Step | Measured |
+| --- | --- |
+| Server process cold start | 15-20 s (torch and transformers imports) |
+| First request, checkpoint not yet cached | 52 s (English), 37 s (multilingual) — mostly download |
+| First request after a restart, cache warm | ~21 s of weight loading and graph init |
+| Warm English request | 1.33-1.39 s |
+| Warm multilingual request | 0.48-0.65 s |
+| Resident memory, both checkpoints loaded | 3.3 GiB of the host's 15 GiB |
+| Checkpoint cache on disk | 1.4 GB |
+| Image, built on the host | 1.76 GB |
+
+The headline latency upstream quotes (~33 ms) is a GPU figure. Budget seconds per
+request on this host, and remember a restart makes the next request per checkpoint pay
+the ~21 s load again — leave the container running instead of restarting it to pick up a
+config change.
+
 ## Updating
 
 ```sh
@@ -181,3 +202,11 @@ and serve only what is already cached.
   accurate on non-Latin scripts; the English checkpoint degrades badly there.
 - **`confidence` is not Jev's confidence.** It is `1 - normalised entropy`; gate on
   `answer_confidence` instead.
+- **Uncalibrated temperature warning.** A checkpoint logs a `RuntimeWarning` from
+  `laya/router.py` on load when it ships temperature values outside `[0.5, 5]`; the
+  values are clamped and upstream says the affected `confidence` entries should be read
+  as uncalibrated. It is a property of the published weights, not of this deployment.
+- **The API is HTTP, not HTTPS.** On a LAN that means the bearer token is sent in the
+  clear. That is why `LAYA_BIND_ADDRESS` exists: point it at `127.0.0.1` and terminate
+  TLS in a reverse proxy (with `LAYA_ROOT_PATH` set if the proxy strips a prefix) before
+  exposing this beyond a trusted network.
