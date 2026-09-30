@@ -26,3 +26,7 @@
 	path = paperclip
 	url = https://github.com/paperclipai/paperclip.git
 	branch = master
+[submodule "data-formulator"]
+	path = data-formulator
+	url = https://github.com/microsoft/data-formulator.git
+	branch = main

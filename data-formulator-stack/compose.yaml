@@ -1,0 +1,42 @@
+# Data Formulator — interactive AI-powered data analysis and visualisation.
+#
+# Deploy stack for hub-playground. Upstream publishes no container image, so
+# this stack builds the image from the vendored ../data-formulator git
+# submodule using the upstream Dockerfile (node 20 frontend build + python 3.11
+# runtime), exactly like the upstream docker-compose.yml does.
+#
+#   cp .env.example .env      # then set FLASK_SECRET_KEY
+#   docker compose up -d --build
+#
+# The build context is the submodule checkout next to this directory; keep both
+# paths together when deploying.
+services:
+  data-formulator:
+    build:
+      context: ${DF_BUILD_CONTEXT:-../data-formulator}
+      dockerfile: Dockerfile
+    # Local-only tag: this image is never pulled, it is always built here.
+    image: hub-playground-data-formulator:${DF_IMAGE_TAG:-0.8b1}
+    container_name: hub-playground-data-formulator
+    restart: unless-stopped
+    # Backstop against a runaway generated-code process. The AI-generated code
+    # itself runs in an in-process sandbox, not a child container.
+    pids_limit: 1024
+    ports:
+      - "0.0.0.0:${DF_PORT:-5567}:5567"
+    # Compose also reads this file for the ${...} interpolation above.
+    env_file:
+      - .env
+    environment:
+      # ── Code-execution sandbox ─────────────────────────────────────────
+      # MUST stay "local". The "docker" backend bind-mounts workspace paths
+      # into child containers, which cannot work when Data Formulator itself
+      # runs inside a container (upstream DEVELOPMENT.md).
+      SANDBOX: "${SANDBOX:-local}"
+      # Must match the mount below; the image default is the same path.
+      DATA_FORMULATOR_HOME: "/home/appuser/.data_formulator"
+    volumes:
+      # Uploaded files, parquet tables and session metadata. The image runs as
+      # appuser (uid 1000), which matches the host's `server` user (uid 1000),
+      # so this bind mount stays writable without privileged chowns.
+      - ./data:/home/appuser/.data_formulator
