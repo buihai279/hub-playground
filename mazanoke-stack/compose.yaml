@@ -1,0 +1,53 @@
+# MAZANOKE image optimizer — see README.md for the operating notes.
+#
+# The container is a stock `nginx:alpine` serving prebuilt static assets: the
+# optimizer runs entirely in the browser, images never leave the client, and
+# there is no backend, no database, and no persistent state. That is why this
+# stack has no volumes and no uid/permission concerns.
+#
+# Upstream ships `ghcr.io/civilblur/mazanoke` (multi-arch), so nothing is built
+# here — the tag is pulled. Upstream's own compose.yaml is the same one service
+# on port 3474; this file only adds the hub-playground conventions.
+services:
+  mazanoke:
+    image: ghcr.io/civilblur/mazanoke:${MAZANOKE_IMAGE_TAG:-v1.1.7}
+    container_name: hub-playground-mazanoke
+    restart: unless-stopped
+    # Upstream CMD is `/bin/sh -c "basicauth.sh; nginx -g 'daemon off;'"`, which
+    # leaves `sh` as PID 1 and nginx as its child. `docker stop` then signals a
+    # shell that does not forward, so shutdown waits out the whole 10 s grace
+    # period before SIGKILL. Running the same script under `exec` makes nginx
+    # PID 1 and shutdown immediate. The image ENTRYPOINT (and therefore
+    # /docker-entrypoint.d) is untouched.
+    command: ["/bin/sh", "-c", "/usr/local/bin/basicauth.sh && exec nginx -g 'daemon off;'"]
+    ports:
+      # The container always listens on 80 — upstream's config/nginx.conf hard-codes
+      # it, so only the host side is configurable.
+      - "${MAZANOKE_BIND_ADDRESS:-0.0.0.0}:${MAZANOKE_PORT:-3474}:80"
+    environment:
+      # Basic auth is applied only when BOTH are non-empty (upstream contract;
+      # see docs/configuration.md). Both are empty in .env.example, so
+      # the playground instance is open — read "Basic auth" in the README before
+      # enabling it, because the password then lives in the container environment.
+      USERNAME: ${MAZANOKE_USERNAME:-}
+      PASSWORD: ${MAZANOKE_PASSWORD:-}
+    healthcheck:
+      # /manifest.json is served unconditionally, so the probe works whether or
+      # not basic auth is on. `wget` is BusyBox's, from the Alpine base.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/manifest.json || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      # nginx drops its workers to the `nginx` user with setuid/setgid syscalls,
+      # not via a setuid binary, so this does not break it.
+      - no-new-privileges:true
+    # One master plus `worker_processes auto` workers (10 on this host) — 256 is
+    # generous headroom without being unbounded.
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

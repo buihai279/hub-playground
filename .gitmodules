@@ -38,3 +38,7 @@
 	path = laya
 	url = https://github.com/NandhaKishorM/laya.git
 	branch = main
+[submodule "mazanoke"]
+	path = mazanoke
+	url = https://github.com/civilblur/mazanoke.git
+	branch = main
