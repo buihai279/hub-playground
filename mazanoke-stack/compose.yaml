@@ -8,18 +8,23 @@
 # Upstream ships `ghcr.io/civilblur/mazanoke` (multi-arch), so nothing is built
 # here — the tag is pulled. Upstream's own compose.yaml is the same one service
 # on port 3474; this file only adds the hub-playground conventions.
+#
+# Note: the root filesystem must stay writable. scripts/metatags.sh runs at every
+# start and copies index.html.template over the served index.html, so
+# `read_only: true` would break the container unless a tmpfs were mounted over
+# /usr/share/nginx/html.
 services:
   mazanoke:
     image: ghcr.io/civilblur/mazanoke:${MAZANOKE_IMAGE_TAG:-v1.1.7}
     container_name: hub-playground-mazanoke
     restart: unless-stopped
-    # Upstream CMD is `/bin/sh -c "basicauth.sh; nginx -g 'daemon off;'"`, which
-    # leaves `sh` as PID 1 and nginx as its child. `docker stop` then signals a
-    # shell that does not forward, so shutdown waits out the whole 10 s grace
-    # period before SIGKILL. Running the same script under `exec` makes nginx
-    # PID 1 and shutdown immediate. The image ENTRYPOINT (and therefore
-    # /docker-entrypoint.d) is untouched.
-    command: ["/bin/sh", "-c", "/usr/local/bin/basicauth.sh && exec nginx -g 'daemon off;'"]
+    # Upstream's CMD is deliberately left alone. It reads like
+    # `/bin/sh -c "basicauth.sh; nginx -g 'daemon off;'"` would leave a shell as
+    # PID 1, but BusyBox ash execs the last command of a `-c` string, so nginx
+    # really is PID 1 (verified on the deployment: `cat /proc/1/comm` → nginx,
+    # and a stop finishes in ~0.6 s instead of waiting out the grace period).
+    # Keeping it also keeps the `;`: a failing basicauth.sh cannot stop nginx
+    # from starting, which `&&` would have broken.
     ports:
       # The container always listens on 80 — upstream's config/nginx.conf hard-codes
       # it, so only the host side is configurable.
@@ -31,6 +36,10 @@ services:
       # enabling it, because the password then lives in the container environment.
       USERNAME: ${MAZANOKE_USERNAME:-}
       PASSWORD: ${MAZANOKE_PASSWORD:-}
+      # Injects the OFFICIAL mazanoke.com SEO/social metatags into the served HTML.
+      # Those describe the upstream hosted product, not this instance, so the knob
+      # stays off here; only the literal string "true" turns them on.
+      METATAGS: ${MAZANOKE_METATAGS:-false}
     healthcheck:
       # /manifest.json is served unconditionally, so the probe works whether or
       # not basic auth is on. `wget` is BusyBox's, from the Alpine base.
